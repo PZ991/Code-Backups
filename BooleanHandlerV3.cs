@@ -11,11 +11,13 @@ public class BooleanHandlerV3 : MonoBehaviour
 {
     // Start is called before the first frame update
     public BooleanOperatorV7 targetboolean;
-    public BooleanOperatorV7 boolean;
+    // public BooleanOperatorV7 boolean;
+    public List<BooleanOperatorV7> booleanlist;
     public Dictionary<Vector3, Dictionary<Vector3, List<bool>>> processedpoints = new Dictionary<Vector3, Dictionary<Vector3, List<bool>>>();
     public Dictionary<Vector3, List<Vector3>> processingpointsdone = new Dictionary<Vector3, List<Vector3>>();
     public List<TriangleData> triangles = new List<TriangleData>();
     public List<Vector3> forbiddenpoints = new List<Vector3>();
+    //public Dictionary<Vector3,int> allvertices = new Dictionary<Vector3, int>();
 
     public bool process;
     public bool process2;
@@ -35,358 +37,483 @@ public class BooleanHandlerV3 : MonoBehaviour
     {
         if (process)
         {
-            processedpoints = new Dictionary<Vector3, Dictionary<Vector3, List<bool>>>();
-            processingpointsdone = new Dictionary<Vector3, List<Vector3>>();
-            Vector3 startingvertex = Vector3.zero;
-            bool found = false;
-            foreach (var item in targetboolean.availableedges)
+            // allvertices.Clear();
             {
-                // int boolval = 0;
-                //Gizmos.DrawSphere(item.Key, 0.05f);
-                if (found)
-                    break;
-                foreach (var item2 in targetboolean.availableedges[item.Key])
+                targetboolean.CompleteReset();
+                targetboolean.UpdateCollisions(true, false);
+                //boolean.UpdateCollisions(false);
+
+                foreach (var item in booleanlist)
                 {
-                    List<bool> ins = new List<bool>();
+                    item.UpdateCollisions(false);
 
-                    ins = PointInside(item.Key, item2.Key, targetboolean.availableedges[item.Key][item2.Key], false);
-
-                    //Debug.Log(ins.Count);
-                    if (ins[0] == true)
-                    {
-                        startingvertex = item.Key;
-                        found = true;
+                }
+                processedpoints = new Dictionary<Vector3, Dictionary<Vector3, List<bool>>>();
+                processingpointsdone = new Dictionary<Vector3, List<Vector3>>();
+                Vector3 startingvertex = Vector3.zero;
+                bool found = false;
+                foreach (var item in targetboolean.availableedges)
+                {
+                    // int boolval = 0;
+                    //Gizmos.DrawSphere(item.Key, 0.05f);
+                    if (found)
                         break;
+                    foreach (var item2 in targetboolean.availableedges[item.Key])
+                    {
+                        List<bool> ins = new List<bool>();
+
+                        ins = PointInside(item.Key, item2.Key, targetboolean.availableedges[item.Key][item2.Key], false);
+
+                        //Debug.Log(ins.Count);
+                        if (ins[0] == true)
+                        {
+                            startingvertex = item.Key;
+                            found = true;
+                            Debug.Log("start");
+
+                            break;
+
+                        }
+                        else if (ins[ins.Count - 1] == true)
+                        {
+                            startingvertex = item2.Key;
+                            found = true;
+                            Debug.Log("end");
+                            break;
+                        }
+                        if (!processingpointsdone.ContainsKey(item.Key))
+                        {
+                            processingpointsdone.Add(item.Key, new List<Vector3> { item2.Key });
+                            processedpoints.Add(item.Key, new Dictionary<Vector3, List<bool>> { { item2.Key, new List<bool> { false, false } } });
+                        }
+                        else if (!processingpointsdone[item.Key].Contains(item2.Key))
+                        {
+                            processingpointsdone[item.Key].Add(item2.Key);
+                            processedpoints[item.Key].Add(item2.Key, new List<bool> { false, false });
+                        }
+                        // Gizmos.DrawSphere(item2.Key, 0.05f);
 
                     }
-                    else if (ins[ins.Count - 1] == true)
-                    {
-                        startingvertex = item2.Key;
-                        found = true;
-                        break;
-                    }
-                    if (!processingpointsdone.ContainsKey(item.Key))
-                    {
-                        processingpointsdone.Add(item.Key, new List<Vector3> { item2.Key });
-                        processedpoints.Add(item.Key, new Dictionary<Vector3, List<bool>> { { item2.Key, new List<bool> { false, false } } });
-                    }
-                    else if (!processingpointsdone[item.Key].Contains(item2.Key))
-                    {
-                        processingpointsdone[item.Key].Add(item2.Key);
-                        processedpoints[item.Key].Add(item2.Key, new List<bool> { false, false });
-                    }
-                    // Gizmos.DrawSphere(item2.Key, 0.05f);
+
+                }
+                if (found)
+                {
+                    //  Debug.Log("Found");
+                    processingpointsdone.Clear();
+                    processedpoints.Clear();
+
+                    selectprocesses(targetboolean, startingvertex, true);
+
+                    //Gizmos.DrawSphere(startingvertex, 0.5f);
 
                 }
 
-            }
-            if (found)
-            {
-                Debug.Log("Found");
-                processingpointsdone.Clear();
-                processedpoints.Clear();
-
-                selectprocesses(startingvertex, true);
-
-                Gizmos.DrawSphere(startingvertex, 0.5f);
-
-            }
 
 
+                forbiddenpoints = new List<Vector3>();
 
-            forbiddenpoints = new List<Vector3>();
 
-
-            foreach (var item in processingpointsdone)
-            {
-                foreach (var item2 in processedpoints[item.Key])
+                foreach (var item in processingpointsdone)
                 {
-                    if (processedpoints[item.Key][item2.Key][0] == false)
-                        Gizmos.color = Color.green;
-                    else
+                    foreach (var item2 in processedpoints[item.Key])
                     {
-                        Gizmos.color = Color.red;
-
-                        forbiddenpoints.Add(item.Key);
-                    }
-
-                    Gizmos.DrawSphere(item.Key, 0.1f);
-
-                    if (processedpoints[item.Key][item2.Key][(processedpoints[item.Key][item2.Key].Count - 1)] == false)
-                        Gizmos.color = Color.green;
-                    else
-                    {
-                        Gizmos.color = Color.red;
-
-                        forbiddenpoints.Add(item2.Key);
-                    }
-                    Gizmos.DrawSphere(item2.Key, 0.1f);
-
-                    if (targetboolean.availableedges[item.Key][item2.Key].Count > 0)
-                    {
-                        for (int i = 0; i < targetboolean.availableedges[item.Key][item2.Key].Count; i++)
+                        if (processedpoints[item.Key][item2.Key][0] == false)
+                            Gizmos.color = Color.green;
+                        else if (processedpoints[item.Key][item2.Key][0] == true)
                         {
-                            /*
-                            if (processedpoints[item.Key][item2.Key][i] == false)
-                                Gizmos.color = Color.green;
-                            else
-                                */
+                            //error causing outside points turning insides
+                            Gizmos.color = Color.blue;
+
+                            forbiddenpoints.Add(item.Key);
+                        }
+
+                        Gizmos.DrawSphere(item.Key, 0.1f);
+
+                        if (processedpoints[item.Key][item2.Key][(processedpoints[item.Key][item2.Key].Count - 1)] == false)
+                            Gizmos.color = Color.green;
+                        else if (processedpoints[item.Key][item2.Key][(processedpoints[item.Key][item2.Key].Count - 1)] == true)
+                        {
                             Gizmos.color = Color.red;
 
-                            Gizmos.DrawSphere(targetboolean.availableedges[item.Key][item2.Key][i].point, 0.1f);
-                            forbiddenpoints.Add(targetboolean.availableedges[item.Key][item2.Key][i].point);
+                            forbiddenpoints.Add(item2.Key);
+                        }
+                        // Gizmos.DrawSphere(item2.Key, 0.1f);
 
+                        if (targetboolean.availableedges[item.Key][item2.Key].Count > 0)
+                        {
+                            for (int i = 0; i < targetboolean.availableedges[item.Key][item2.Key].Count; i++)
+                            {
+                                /*
+                                if (processedpoints[item.Key][item2.Key][i] == false)
+                                    Gizmos.color = Color.green;
+                                else
+                                    */
+                                Gizmos.color = Color.yellow;
+
+                                Gizmos.DrawSphere(targetboolean.availableedges[item.Key][item2.Key][i].point, 0.1f);
+                                forbiddenpoints.Add(targetboolean.availableedges[item.Key][item2.Key][i].point);
+
+                            }
                         }
                     }
                 }
-            }
 
 
 
 
-            triangles.Clear();
+                triangles.Clear();
 
-            foreach (var item in targetboolean.triangleDatas)
-            {
-
-                Gizmos.color = Color.white;
-
-                List<TriangleData> newtris = new List<TriangleData>();
-
-                Vector3 SupraV1 = item.points[0];
-                Vector3 SupraV2 = item.points[1];
-                Vector3 SupraV3 = item.points[2];
-
-                Vector3 p12 = SupraV2 - SupraV1;
-                Vector3 p13 = SupraV3 - SupraV1;
-                Vector3 p23 = SupraV3 - SupraV2;
-
-                Vector3 newV1 = -p12 - p13 + SupraV1;
-                Vector3 newV2 = p13 + p23 + SupraV3;
-                Vector3 newV3 = p12 - p23 + SupraV2;
-                newtris.Add(new TriangleData(newV1, newV2, newV3));
-                List<Vector3> newpoints = new List<Vector3>();
-
-                newpoints.Add(SupraV1);
-                newpoints.Add(SupraV2);
-                newpoints.Add(SupraV3);
-                forbiddenpoints.Add(newV1);
-                forbiddenpoints.Add(newV2);
-                forbiddenpoints.Add(newV3);
-                foreach (var item2 in targetboolean.availableedges[item.points[0]][item.points[1]])
+                foreach (var item in targetboolean.triangleDatas)
                 {
-                    if (!newpoints.Contains(item2.point))
-                        newpoints.Add(item2.point);
-                }
-                foreach (var item2 in targetboolean.availableedges[item.points[2]][item.points[1]])
-                {
-                    if (!newpoints.Contains(item2.point))
 
-                        newpoints.Add(item2.point);
-                }
-                foreach (var item2 in targetboolean.availableedges[item.points[0]][item.points[2]])
-                {
-                    if (!newpoints.Contains(item2.point))
+                    Gizmos.color = Color.white;
 
-                        newpoints.Add(item2.point);
-                }
+                    List<TriangleData> newtris = new List<TriangleData>();
 
-                TriangulateVertices(targetboolean, newV1, newV2, newV3, newpoints, forbiddenpoints, newtris, true, true);
-                foreach (var item2 in newtris)
-                {
-                    triangles.Add(item2);
-                }
-            }
-            Debug.Log(forbiddenpoints.Count);
+                    Vector3 SupraV1 = item.points[0];
+                    Vector3 SupraV2 = item.points[1];
+                    Vector3 SupraV3 = item.points[2];
+                    int triangleindex = targetboolean.verticestriangle[item.points[0]][item.points[1]][item.points[2]];
+                    int vertexIndex = targetboolean.GetComponent<MeshFilter>().mesh.triangles[triangleindex * 3];
 
+                    Vector3 vertexNormal = targetboolean.GetComponent<MeshFilter>().mesh.normals[vertexIndex];
+                    Vector3 p12 = SupraV2 - SupraV1;
+                    Vector3 p13 = SupraV3 - SupraV1;
+                    Vector3 p23 = SupraV3 - SupraV2;
 
-            process = false;
-
-        }
-
-        if (process2)
-        {
-            processedpoints = new Dictionary<Vector3, Dictionary<Vector3, List<bool>>>();
-            processingpointsdone = new Dictionary<Vector3, List<Vector3>>();
-            Vector3 startingvertex = Vector3.zero;
-            bool found = false;
-            foreach (var item in boolean.availableedges)
-            {
-                // int boolval = 0;
-                //Gizmos.DrawSphere(item.Key, 0.05f);
-                if (found)
-                    break;
-                foreach (var item2 in boolean.availableedges[item.Key])
-                {
-                    List<bool> ins = new List<bool>();
-
-                    ins = PointInside(item.Key, item2.Key, boolean.availableedges[item.Key][item2.Key], false);
-
-                    //Debug.Log(ins.Count);
-                    if (ins[0] == true)
+                    Vector3 newV1 = -p12 - p13 + SupraV1;
+                    Vector3 newV2 = p13 + p23 + SupraV3;
+                    Vector3 newV3 = p12 - p23 + SupraV2;
+                    /*
+                    Vector3 oldnorm = Vector3.zero;
+                    Vector3[] vertices = new Vector3[] { newV1, newV2, newV3 };
+                    int index2 = 0;
+                    for (int i = 0; i < 3; i++)
                     {
-                        startingvertex = item.Key;
-                        found = true;
-                        break;
 
-                    }
-                    else if (ins[ins.Count - 1] == true)
-                    {
-                        startingvertex = item2.Key;
-                        found = true;
-                        break;
-                    }
-                    if (!processingpointsdone.ContainsKey(item.Key))
-                    {
-                        processingpointsdone.Add(item.Key, new List<Vector3> { item2.Key });
-                        processedpoints.Add(item.Key, new Dictionary<Vector3, List<bool>> { { item2.Key, new List<bool> { false, false } } });
-                    }
-                    else if (!processingpointsdone[item.Key].Contains(item2.Key))
-                    {
-                        processingpointsdone[item.Key].Add(item2.Key);
-                        processedpoints[item.Key].Add(item2.Key, new List<bool> { false, false });
-                    }
-                    // Gizmos.DrawSphere(item2.Key, 0.05f);
-
-                }
-
-            }
-            if (found)
-            {
-                Debug.Log("Found");
-                processingpointsdone.Clear();
-                processedpoints.Clear();
-
-                selectprocesses(boolean, startingvertex, true);
-
-                Gizmos.DrawSphere(startingvertex, 0.5f);
-
-            }
-
-
-
-            forbiddenpoints = new List<Vector3>();
-
-
-            foreach (var item in processingpointsdone)
-            {
-                foreach (var item2 in processedpoints[item.Key])
-                {
-                    if (processedpoints[item.Key][item2.Key][0] == false)
-                        Gizmos.color = Color.green;
-                    else
-                    {
-                        Gizmos.color = Color.red;
-
-                        forbiddenpoints.Add(item.Key);
-                    }
-
-                    Gizmos.DrawSphere(item.Key, 0.1f);
-
-                    if (processedpoints[item.Key][item2.Key][(processedpoints[item.Key][item2.Key].Count - 1)] == false)
-                        Gizmos.color = Color.green;
-                    else
-                    {
-                        Gizmos.color = Color.red;
-
-                        forbiddenpoints.Add(item2.Key);
-                    }
-                    Gizmos.DrawSphere(item2.Key, 0.1f);
-
-                    if (boolean.availableedges[item.Key][item2.Key].Count > 0)
-                    {
-                        for (int i = 0; i < boolean.availableedges[item.Key][item2.Key].Count; i++)
+                        if ((oldnorm.normalized != vertexNormal.normalized) || (-oldnorm.normalized != vertexNormal.normalized))
                         {
-                            /*
-                            if (processedpoints[item.Key][item2.Key][i] == false)
-                                Gizmos.color = Color.green;
-                            else
-                                */
+                            CalculateTriangleData(vertices[i], vertices[(i + 1) % 3], vertices[(i + 2) % 3], out oldnorm);
+                            Debug.Log(oldnorm.normalized + "///" + vertexNormal.normalized);
+                            index2 = i;
+                        }
+                        else
+                        {
+                            //  index2 = i;
+                            break;
+                        }
+                    }
+
+                    //newtris.Add(new TriangleData(vertices[index2], vertices[(index2 + 1) % 3], vertices[(index2 + 2) % 3], vertexNormal));
+                    */
+                    newtris.Add(new TriangleData(newV1, newV2, newV3, vertexNormal));
+                    List<Vector3> newpoints = new List<Vector3>();
+
+                    newpoints.Add(SupraV1);
+                    newpoints.Add(SupraV2);
+                    newpoints.Add(SupraV3);
+                    forbiddenpoints.Add(newV1);
+                    forbiddenpoints.Add(newV2);
+                    forbiddenpoints.Add(newV3);
+                    foreach (var item2 in targetboolean.availableedges[item.points[0]][item.points[1]])
+                    {
+                        if (!newpoints.Contains(item2.point))
+                            newpoints.Add(item2.point);
+                    }
+                    foreach (var item2 in targetboolean.availableedges[item.points[2]][item.points[1]])
+                    {
+                        if (!newpoints.Contains(item2.point))
+
+                            newpoints.Add(item2.point);
+                    }
+                    foreach (var item2 in targetboolean.availableedges[item.points[0]][item.points[2]])
+                    {
+                        if (!newpoints.Contains(item2.point))
+
+                            newpoints.Add(item2.point);
+                    }
+
+                    int index = targetboolean.verticestriangle[item.points[0]][item.points[1]][item.points[2]];
+                    if (targetboolean.availableTriangles.ContainsKey(index))
+                    {
+                        foreach (var item2 in targetboolean.availableTriangles[index])
+                        {
+                            newpoints.Add(item2);
+
+                            forbiddenpoints.Add(item2);
+                            //Gizmos.color = Color.red;
+
+                            Gizmos.DrawSphere(item2, 0.1f);
+                            Debug.DrawRay(item2, targetboolean.vectornormals[item2]);
+                        }
+                    }
+                    TriangulateVertices(targetboolean, newV1, newV2, newV3, newpoints, forbiddenpoints, newtris, true, true, vertexNormal);
+                    foreach (var item2 in newtris)
+                    {
+                        triangles.Add(item2);
+                    }
+                    /*
+                    foreach (var item2 in forbiddenpoints)
+                    {
+                        if(!allvertices.ContainsKey(item2))
+                        allvertices.Add(item2, allvertices.Count);
+                    }
+                    foreach (var item2 in newpoints)
+                    {
+                        if(!allvertices.ContainsKey(item2))
+                        allvertices.Add(item2, allvertices.Count);
+                    }
+                    */
+                }
+                //Debug.Log(forbiddenpoints.Count);
+
+
+            }
+
+            foreach (var boolean in booleanlist)
+            {
+
+                boolean.CompleteReset();
+                boolean.UpdateCollisions(true, false);
+                targetboolean.UpdateCollisions(false);
+                processedpoints = new Dictionary<Vector3, Dictionary<Vector3, List<bool>>>();
+                processingpointsdone = new Dictionary<Vector3, List<Vector3>>();
+                Vector3 startingvertex = Vector3.zero;
+                bool found = false;
+                foreach (var item in boolean.availableedges)
+                {
+                    // int boolval = 0;
+                    //Gizmos.DrawSphere(item.Key, 0.05f);
+                    if (found)
+                        break;
+                    foreach (var item2 in boolean.availableedges[item.Key])
+                    {
+                        List<bool> ins = new List<bool>();
+
+                        ins = PointInside(item.Key, item2.Key, boolean.availableedges[item.Key][item2.Key], false);
+
+                        //Debug.Log(ins.Count);
+                        if (ins[0] == true)
+                        {
+                            startingvertex = item.Key;
+                            found = true;
+                            break;
+
+                        }
+                        else if (ins[ins.Count - 1] == true)
+                        {
+                            startingvertex = item2.Key;
+                            found = true;
+                            break;
+                        }
+                        if (!processingpointsdone.ContainsKey(item.Key))
+                        {
+                            processingpointsdone.Add(item.Key, new List<Vector3> { item2.Key });
+                            processedpoints.Add(item.Key, new Dictionary<Vector3, List<bool>> { { item2.Key, new List<bool> { false, false } } });
+                        }
+                        else if (!processingpointsdone[item.Key].Contains(item2.Key))
+                        {
+                            processingpointsdone[item.Key].Add(item2.Key);
+                            processedpoints[item.Key].Add(item2.Key, new List<bool> { false, false });
+                        }
+                        // Gizmos.DrawSphere(item2.Key, 0.05f);
+
+                    }
+
+                }
+                if (found)
+                {
+                    // Debug.Log("Found");
+                    processingpointsdone.Clear();
+                    processedpoints.Clear();
+
+                    selectprocesses(boolean, startingvertex, true);
+
+                    Gizmos.DrawSphere(startingvertex, 0.5f);
+
+                }
+
+
+
+                forbiddenpoints = new List<Vector3>();
+
+
+                foreach (var item in processingpointsdone)
+                {
+                    foreach (var item2 in processedpoints[item.Key])
+                    {
+                        if (processedpoints[item.Key][item2.Key][0] == false)
+                            Gizmos.color = Color.green;
+                        else
+                        {
                             Gizmos.color = Color.red;
 
-                            Gizmos.DrawSphere(boolean.availableedges[item.Key][item2.Key][i].point, 0.1f);
-                            forbiddenpoints.Add(boolean.availableedges[item.Key][item2.Key][i].point);
+                            forbiddenpoints.Add(item.Key);
+                        }
 
+                        Gizmos.DrawSphere(item.Key, 0.1f);
+
+                        if (processedpoints[item.Key][item2.Key][(processedpoints[item.Key][item2.Key].Count - 1)] == false)
+                            Gizmos.color = Color.green;
+                        else
+                        {
+                            Gizmos.color = Color.red;
+
+                            forbiddenpoints.Add(item2.Key);
+                        }
+                        Gizmos.DrawSphere(item2.Key, 0.1f);
+
+                        if (boolean.availableedges[item.Key][item2.Key].Count > 0)
+                        {
+                            for (int i = 0; i < boolean.availableedges[item.Key][item2.Key].Count; i++)
+                            {
+                                /*
+                                if (processedpoints[item.Key][item2.Key][i] == false)
+                                    Gizmos.color = Color.green;
+                                else
+                                    */
+                                Gizmos.color = Color.red;
+
+                                Gizmos.DrawSphere(boolean.availableedges[item.Key][item2.Key][i].point, 0.1f);
+                                forbiddenpoints.Add(boolean.availableedges[item.Key][item2.Key][i].point);
+
+                            }
                         }
                     }
                 }
-            }
 
 
 
 
-            triangles.Clear();
+                // triangles.Clear();
 
-            foreach (var item in boolean.triangleDatas)
-            {
-
-                Gizmos.color = Color.white;
-
-                List<TriangleData> newtris = new List<TriangleData>();
-
-                Vector3 SupraV1 = item.points[0];
-                Vector3 SupraV2 = item.points[1];
-                Vector3 SupraV3 = item.points[2];
-
-
-                Vector3 p12 = SupraV2 - SupraV1;
-                Vector3 p13 = SupraV3 - SupraV1;
-                Vector3 p23 = SupraV3 - SupraV2;
-
-                Vector3 newV1 = -p12 - p13 + SupraV1;
-                Vector3 newV2 = p13 + p23 + SupraV3;
-                Vector3 newV3 = p12 - p23 + SupraV2;
-                newtris.Add(new TriangleData(newV1, newV2, newV3));
-                List<Vector3> newpoints = new List<Vector3>();
-
-                newpoints.Add(SupraV1);
-                newpoints.Add(SupraV2);
-                newpoints.Add(SupraV3);
-                foreach (var item2 in boolean.availableedges[item.points[0]][item.points[1]])
+                foreach (var item in boolean.triangleDatas)
                 {
-                    if (!newpoints.Contains(item2.point))
-                        newpoints.Add(item2.point);
-                }
-                foreach (var item2 in boolean.availableedges[item.points[2]][item.points[1]])
-                {
-                    if (!newpoints.Contains(item2.point))
 
-                        newpoints.Add(item2.point);
-                }
-                foreach (var item2 in boolean.availableedges[item.points[0]][item.points[2]])
-                {
-                    if (!newpoints.Contains(item2.point))
+                    Gizmos.color = Color.white;
 
-                        newpoints.Add(item2.point);
-                }
+                    List<TriangleData> newtris = new List<TriangleData>();
 
-                int index = boolean.verticestriangle[item.points[0]][item.points[1]][item.points[2]];
-                if (boolean.availableTriangles.ContainsKey(index))
-                {
-                    foreach (var item2 in boolean.availableTriangles[index])
+                    Vector3 SupraV1 = item.points[0];
+                    Vector3 SupraV2 = item.points[1];
+                    Vector3 SupraV3 = item.points[2];
+
+                    int triangleindex = boolean.verticestriangle[item.points[0]][item.points[1]][item.points[2]];
+                    int vertexIndex = boolean.GetComponent<MeshFilter>().mesh.triangles[triangleindex * 3];
+
+                    Vector3 vertexNormal = boolean.GetComponent<MeshFilter>().mesh.normals[vertexIndex];
+
+                    Vector3 p12 = SupraV2 - SupraV1;
+                    Vector3 p13 = SupraV3 - SupraV1;
+                    Vector3 p23 = SupraV3 - SupraV2;
+
+                    Vector3 newV1 = -p12 - p13 + SupraV1;
+                    Vector3 newV2 = p13 + p23 + SupraV3;
+                    Vector3 newV3 = p12 - p23 + SupraV2;
+
+                    /*
+                    Vector3 oldnorm = Vector3.zero;
+                    Vector3[] vertices = new Vector3[] { newV1, newV2, newV3 };
+                    int index2 = 0;
+                    for (int i = 0; i < 3; i++)
                     {
-                        newpoints.Add(item2);
 
-                        forbiddenpoints.Add(item2);
-                        //Gizmos.color = Color.red;
-
-                        Gizmos.DrawSphere(item2, 0.1f);
-                        Debug.DrawRay(item2, boolean.vectornormals[item2]);
+                        if (oldnorm.normalized != vertexNormal.normalized)
+                        {
+                            CalculateTriangleData(vertices[i], vertices[(i + 1) % 3], vertices[(i + 2) % 3], out oldnorm);
+                            index2 = i;
+                        }
+                        else
+                            break;
                     }
+
+                    //newtris.Add(new TriangleData(vertices[index2], vertices[(index2 + 1) % 3], vertices[(index2 + 2) % 3], vertexNormal));
+                    */
+                    newtris.Add(new TriangleData(newV1, newV2, newV3, vertexNormal));
+
+                    List<Vector3> newpoints = new List<Vector3>();
+
+                    newpoints.Add(SupraV1);
+                    newpoints.Add(SupraV2);
+                    newpoints.Add(SupraV3);
+                    foreach (var item2 in boolean.availableedges[item.points[0]][item.points[1]])
+                    {
+                        if (!newpoints.Contains(item2.point))
+                            newpoints.Add(item2.point);
+                    }
+                    foreach (var item2 in boolean.availableedges[item.points[2]][item.points[1]])
+                    {
+                        if (!newpoints.Contains(item2.point))
+
+                            newpoints.Add(item2.point);
+                    }
+                    foreach (var item2 in boolean.availableedges[item.points[0]][item.points[2]])
+                    {
+                        if (!newpoints.Contains(item2.point))
+
+                            newpoints.Add(item2.point);
+                    }
+
+
+                    int index = boolean.verticestriangle[item.points[0]][item.points[1]][item.points[2]];
+                    if (boolean.availableTriangles.ContainsKey(index))
+                    {
+                        foreach (var item2 in boolean.availableTriangles[index])
+                        {
+                            newpoints.Add(item2);
+
+                            // forbiddenpoints.Add(item2);
+                            //Gizmos.color = Color.red;
+
+                            Gizmos.DrawSphere(item2, 0.1f);
+                            Debug.DrawRay(item2, boolean.vectornormals[item2]);
+                        }
+                    }
+                    InverseTriangulateVertices(boolean, newV1, newV2, newV3, newpoints, forbiddenpoints, newtris, true, true, vertexNormal);
+                    foreach (var item2 in newtris)
+                    {
+                        triangles.Add(item2);
+                    }
+                    /*
+                    foreach (var item2 in forbiddenpoints)
+                    {
+                        if (!allvertices.ContainsKey(item2))
+                            allvertices.Add(item2, allvertices.Count);
+                    }
+                    foreach (var item2 in newpoints)
+                    {
+                        if (!allvertices.ContainsKey(item2))
+                            allvertices.Add(item2, allvertices.Count);
+                    }
+                    */
                 }
-                TriangulateVertices(boolean, newV1, newV2, newV3, newpoints, forbiddenpoints, newtris, true, false);
-                foreach (var item2 in newtris)
-                {
-                    triangles.Add(item2);
-                }
+                // Debug.Log(forbiddenpoints.Count);
+
+
+                process = false;
             }
-            Debug.Log(forbiddenpoints.Count);
-
-
-            process2 = false;
-
+            /*
+            List<Vector3> newvertices = new List<Vector3>();
+            List<Vector3> newnormals = new List<Vector3>();
+            List<int> newtriangles = new List<int>();
+            foreach (var item in triangles)
+            {
+                foreach (var item2 in item.points)
+                {
+                    newvertices.Add(targetboolean.transform.InverseTransformPoint(item2));
+                    newnormals.Add(item.normal);
+                }
+                newtriangles.Add(newvertices.Count - 3);
+                newtriangles.Add(newvertices.Count - 2);
+                newtriangles.Add(newvertices.Count - 1);
+            }
+            Mesh mesh = new Mesh();
+            mesh.vertices = newvertices.ToArray();
+            mesh.normals = newnormals.ToArray();
+            mesh.triangles = newtriangles.ToArray();
+            targetboolean.GetComponent<MeshFilter>().mesh = mesh;
+            */
         }
-
         if (show)
         {
             //Debug.Log(processingpointsdone.Count);
@@ -403,8 +530,9 @@ public class BooleanHandlerV3 : MonoBehaviour
             }
 
         }
-    }
 
+    }
+    /*
     public void selectprocesses(Vector3 point, bool inside)
     {
         foreach (var item in targetboolean.availableedges[point])
@@ -453,10 +581,10 @@ public class BooleanHandlerV3 : MonoBehaviour
                 ins.Reverse();
                 processedpoints.Add(item.Key, new Dictionary<Vector3, List<bool>> { { point, ins } });
             }
-            */
+            ///
         }
     }
-
+    */
     //fix when collision is more than 1
     public void selectprocesses(BooleanOperatorV7 boolop, Vector3 point, bool inside)
     {
@@ -522,13 +650,13 @@ public class BooleanHandlerV3 : MonoBehaviour
             sortedData2.Insert(sortedData2.Count - 1, p1);
             bool inside = false;
             int insides = 0;
-            for (int i = 0; i < sortedData2.Count - 1; i++)
+            for (int i = 0; i < sortedData2.Count; i++)
             {
 
                 //Debug.Log(plane.GetSide(vertices2[displayVertex1]));
                 // Plane plane = new Plane(sortedData[i].normal, sortedData2[i + 1]); 
 
-                if (i > 0 && i < sortedData.Count - 1)
+                if (i > 0 && i < sortedData.Count)
                 {
 
                     Plane plane = new Plane(sortedData[i - 1].normal, sortedData[i - 1].point);
@@ -552,20 +680,26 @@ public class BooleanHandlerV3 : MonoBehaviour
                     Plane plane = new Plane(sortedData[i].normal, sortedData[i].point);
 
                     inside = !plane.GetSide(sortedData2[i]);
+                    Gizmos.DrawRay(sortedData[i].point, sortedData[i].normal);
+                    //  Debug.Log(inside + "//" + sortedData2[i] + "////" + sortedData[i].point);
                 }
-                else if (i >= sortedData.Count - 1)
+                else if (i == sortedData.Count)
                 {
                     Plane plane = new Plane(sortedData[sortedData.Count - 1].normal, sortedData[sortedData.Count - 1].point);
-
                     inside = !plane.GetSide(sortedData2[i]);
+
                 }
                 if (inside)
                 {
                     isinside.Add(true);
+                    Gizmos.color = Color.red;
+                    // Gizmos.DrawSphere(sortedData2[i], 0.8f);
+
                 }
                 else
                 {
                     Gizmos.color = Color.green;
+                    // Gizmos.DrawSphere(sortedData2[i], 0.8f);
                     isinside.Add(false);
 
                 }
@@ -600,6 +734,8 @@ public class BooleanHandlerV3 : MonoBehaviour
         }
         return isinside;
     }
+
+    /*
     public static List<bool> PointInside(Vector3 p1, Vector3 p2, RaycastHit[] hit, RaycastHit[] hit2, List<RaycastHit> sortedData, bool alreadyinside)
     {
         List<Vector3> sortedData2 = sortedData.Select(item => item.point).ToList();
@@ -699,8 +835,9 @@ public class BooleanHandlerV3 : MonoBehaviour
         }
         return isinside;
     }
+    */
 
-    public void TriangulateVertices(BooleanOperatorV7 V7, Vector3 SupraV1, Vector3 SupraV2, Vector3 SupraV3, List<Vector3> normalpoints, List<Vector3> forbidden, List<TriangleData> Triangles, bool removeSupra, bool removepoints)
+    public void TriangulateVertices(BooleanOperatorV7 V7, Vector3 SupraV1, Vector3 SupraV2, Vector3 SupraV3, List<Vector3> normalpoints, List<Vector3> forbidden, List<TriangleData> Triangles, bool removeSupra, bool removepoints, Vector3 normal)
     {
 
 
@@ -736,7 +873,35 @@ public class BooleanHandlerV3 : MonoBehaviour
 
             foreach (var item2 in newavailablededges)
             {
-                Triangles.Add(new TriangleData(item2[0], item2[1], item));
+                /*
+                Vector3 oldnorm = Vector3.zero;
+                Vector3[] vertices = new Vector3[] { item2[0], item2[1], item };
+                int index = 0;
+                for (int i = 0; i < 3; i++)
+                {
+
+                    if ((oldnorm.normalized != normal.normalized) || (-oldnorm.normalized != normal.normalized))
+                    {
+                        CalculateTriangleData(vertices[i], vertices[(i + 1) % 3], vertices[(i + 2) % 3], out oldnorm);
+                        index = i;
+                    }
+                    else
+                        break;
+                }
+                */
+                if (!forbiddenpoints.Contains(item2[1]))
+                    Triangles.Add(new TriangleData(item2[0], item2[1], item, normal));
+                else if (!forbiddenpoints.Contains(item))
+                {
+                    Triangles.Add(new TriangleData(item2[0], item, item2[1], normal));
+
+                }
+                else
+                {
+                    Triangles.Add(new TriangleData(item, item2[0], item2[1], normal));
+
+                }
+                //Triangles.Add(new TriangleData(item, item2[1], item2[0], normal));
 
             }
         }
@@ -798,6 +963,130 @@ public class BooleanHandlerV3 : MonoBehaviour
         }
 
     }
+    public void InverseTriangulateVertices(BooleanOperatorV7 V7, Vector3 SupraV1, Vector3 SupraV2, Vector3 SupraV3, List<Vector3> normalpoints, List<Vector3> forbidden, List<TriangleData> Triangles, bool removeSupra, bool removepoints, Vector3 normal)
+    {
+
+
+        foreach (var item in normalpoints)
+        {
+            List<TriangleData> insidetriangle = new List<TriangleData>();
+            foreach (var item2 in Triangles)
+            {
+                if (Vector3.Distance(item2.circumcirclepos, item) < item2.circumdistance)
+                {
+                    insidetriangle.Add(item2);
+
+                }
+
+            }
+            List<Vector3[]> availablededges = new List<Vector3[]>();
+            List<Vector3[]> bannededges = new List<Vector3[]>();
+
+            foreach (var item2 in insidetriangle)
+            {
+                Vector3[] edge1 = new Vector3[] { item2.points[0], item2.points[1] };
+                Vector3[] edge2 = new Vector3[] { item2.points[1], item2.points[2] };
+                Vector3[] edge3 = new Vector3[] { item2.points[2], item2.points[0] };
+                availablededges.Add(edge1);
+                availablededges.Add(edge2);
+                availablededges.Add(edge3);
+
+                Triangles.Remove(item2);
+
+            }
+            List<Vector3[]> newavailablededges = RemoveDuplicates(availablededges);
+
+
+            foreach (var item2 in newavailablededges)
+            {
+                /*
+                Vector3 oldnorm = Vector3.zero;
+                Vector3[] vertices = new Vector3[] { item2[0], item2[1], item };
+                int index = 0;
+                for (int i = 0; i < 3; i++)
+                {
+
+                    if (oldnorm.normalized != normal.normalized)
+                    {
+                        CalculateTriangleData(vertices[i], vertices[(i + 1) % 3], vertices[(i + 2) % 3], out oldnorm);
+                        index = i;
+                    }
+                    else
+                        break;
+                }
+                */
+
+                Triangles.Add(new TriangleData(item2[0], item2[1], item, normal));
+
+                //Triangles.Add(new TriangleData(item2[0], item2[1], item, normal));
+
+            }
+        }
+        if (removeSupra)
+        {
+            List<TriangleData> data = new List<TriangleData>();
+            foreach (var item in Triangles)
+            {
+
+
+                foreach (var item3 in item.points)
+                {
+
+                    if (ApproximateVector(item3, SupraV1) || ApproximateVector(item3, SupraV2) || ApproximateVector(item3, SupraV3))
+                        // if (item3.Equals(SupraV1) || item3.Equals(SupraV2) || item3.Equals(SupraV3))
+                        data.Add(item);
+                    // else
+                    //Debug.Log(item3 + "/////" + SupraV1 + "/" + SupraV2 + "/" + SupraV3 + "/");
+
+                }
+
+            }
+            foreach (var item in data)
+            {
+                Triangles.Remove(item);
+            }
+        }
+        if (removepoints)
+        {
+            List<TriangleData> data = new List<TriangleData>();
+            foreach (var item in Triangles)
+            {
+                /*
+                if (processingpoints.Contains((item.Edges[0].points[0])) && processingpoints.Contains((item.Edges[1].points[1])) && processingpoints.Contains((item.Edges[2].points[0])))
+                {
+                    data.Add(item);
+                }
+                */
+                if (!data.Contains(item))
+                {
+                    if (!((forbidden.Contains(item.points[0])) &&
+                        (forbidden.Contains(item.points[1])) &&
+                        (forbidden.Contains(item.points[2]))))
+                    {
+                        /* 
+                        if (!((Vector3.Angle(V7.vectornormals[item.points[0]], (item.circumcirclepos - item.points[0]).normalized) > 90) ||
+                         (Vector3.Angle(V7.vectornormals[item.points[1]], (item.circumcirclepos - item.points[1]).normalized) > 90) ||
+                         (Vector3.Angle(V7.vectornormals[item.points[2]], (item.circumcirclepos - item.points[2]).normalized) > 90)))
+                           */
+                        //Gizmos.DrawLine(item.points[0], item.circumcirclepos);
+                        //Gizmos.DrawLine(item.points[1], item.circumcirclepos);
+                        // Gizmos.DrawLine(item.points[2], item.circumcirclepos);
+
+                        data.Add(item);
+                    }
+
+                }
+
+            }
+            foreach (var item in data)
+            {
+                Triangles.Remove(item);
+            }
+        }
+
+    }
+
+
     public static List<Vector3[]> RemoveDuplicates(List<Vector3[]> vectorArraysList)
     {
         List<Vector3[]> uniqueArrays = new List<Vector3[]>(vectorArraysList.Count);
@@ -814,7 +1103,7 @@ public class BooleanHandlerV3 : MonoBehaviour
                 {
                     isDuplicate = true;
                     bannedArrays.Add(array);
-                    Debug.Log("yes");
+                    //  Debug.Log("yes");
                     break;
                 }
             }
@@ -824,7 +1113,7 @@ public class BooleanHandlerV3 : MonoBehaviour
                 if (ArraysHaveSameElements(array, banneditem))
                 {
                     isbanned = true;
-                    Debug.Log("ban");
+                    // Debug.Log("ban");
                 }
             }
             // If it's not a duplicate, add it to the uniqueArrays list
@@ -881,6 +1170,21 @@ public class BooleanHandlerV3 : MonoBehaviour
         Vector3 normal13 = Vector3.Cross(normal, dir13);
 
         Utility.LineIntersection(out finalpos, midpoint12, normal12, midpoint23, normal23);
+
+    }
+    public static void CalculateTriangleData(Vector3 p1, Vector3 p2, Vector3 p3, out Vector3 normal)
+    {
+        Vector3 midpoint12 = (p1 + p2) / 2;
+        Vector3 dir12 = p2 - p1;
+
+        Vector3 midpoint23 = (p3 + p2) / 2;
+        Vector3 dir23 = p2 - p3;
+
+        Vector3 midpoint13 = (p1 + p3) / 2;
+
+        Vector3 dir13 = p1 - p3;
+        normal = Vector3.Cross(p2 - p1, p3 - p1);
+
 
     }
 

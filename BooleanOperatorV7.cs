@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEditor.Progress;
 
@@ -18,8 +19,7 @@ public class BooleanOperatorV7 : MonoBehaviour
     public Dictionary<Vector3, Dictionary<Vector3, Dictionary<Vector3, int>>> verticestriangle = new Dictionary<Vector3, Dictionary<Vector3, Dictionary<Vector3, int>>>();
     public List<BooleanHandlerV3.TriangleData> triangleDatas = new List<BooleanHandlerV3.TriangleData>();
     public GameObject targetObject;
-    public bool resetDictionary;
-    public bool resetTris;
+    public bool reset;
     void Start()
     {
 
@@ -32,21 +32,22 @@ public class BooleanOperatorV7 : MonoBehaviour
     }
     private void OnDrawGizmos()
     {
-        if (resetDictionary)
+        if (reset)
         {
-            ResetDictionary();
-            resetDictionary = false;
-        }
-        if (resetTris)
-        {
-            availableTriangles = new Dictionary<int, List<Vector3>>();
-            verticestriangle = new Dictionary<Vector3, Dictionary<Vector3, Dictionary<Vector3, int>>>();
-            resetTris = false;
+            CompleteReset();
+            UpdateCollisions();
+
+            reset = false;
         }
 
+
     }
-    public void ResetDictionary()
+
+    public void CompleteReset()
     {
+        availableTriangles = new Dictionary<int, List<Vector3>>();
+        verticestriangle = new Dictionary<Vector3, Dictionary<Vector3, Dictionary<Vector3, int>>>();
+
         availableVertices = new Dictionary<Vector3, List<int>>();
         availableedges = new Dictionary<Vector3, Dictionary<Vector3, List<RaycastHit>>>();
         triangleDatas = new List<BooleanHandlerV3.TriangleData>();
@@ -69,8 +70,10 @@ public class BooleanOperatorV7 : MonoBehaviour
             Vector3 V1 = transform.TransformPoint(vertices2[vertexIndex1]);
             Vector3 V2 = transform.TransformPoint(vertices2[vertexIndex2]);
             Vector3 V3 = transform.TransformPoint(vertices2[vertexIndex3]);
-            Vector3 triangleNormal = (normalA + normalB + normalC).normalized;
-            triangleDatas.Add(new BooleanHandlerV3.TriangleData(V1, V2, V3, triangleNormal));
+            //Vector3 triangleNormal = (normalA + normalB + normalC).normalized;
+            Vector3 vertexNormal = mesh2.normals[vertexIndex1];
+
+            triangleDatas.Add(new BooleanHandlerV3.TriangleData(V1, V2, V3, vertexNormal));
             /*
             if (!availableTriangles.ContainsKey(i))
                 availableTriangles.Add(i, new List<Vector3>() { V1, V2, V3 });
@@ -196,6 +199,16 @@ public class BooleanOperatorV7 : MonoBehaviour
         }
 
 
+    }
+
+
+    public void UpdateCollisions(bool self = true, bool others = true)
+    {
+        Mesh mesh2 = Utility.GetMesh(targetObject);
+        Vector3[] vertices2 = mesh2.vertices;
+        Vector3[] normals = mesh2.normals;
+
+        int[] triangles = mesh2.triangles;
         for (int i = 0; i < triangles.Length / 3; i++)
         {
             int vertexIndex1 = triangles[i * 3];
@@ -208,219 +221,176 @@ public class BooleanOperatorV7 : MonoBehaviour
             Vector3 normalB = normals[vertexIndex2];
             Vector3 normalC = normals[vertexIndex3];
             Vector3 triangleNormal = (normalA + normalB + normalC).normalized;
-            #region Edge connections
-
-            if (!availableedges.ContainsKey(V1))
-            {
-
-                availableedges.Add(V1, new Dictionary<Vector3, List<RaycastHit>> { { V2, RaycastLine(V1, V2, triangleNormal) } });
-
-                availableedges[V1].Add(V3, RaycastLine(V1, V3, triangleNormal));
-            }
-            else
-            {
-
-                if (!availableedges[V1].ContainsKey(V2))
-                    availableedges[V1].Add(V2, RaycastLine(V1, V2, triangleNormal));
-                if (!availableedges[V1].ContainsKey(V3))
-                    availableedges[V1].Add(V3, RaycastLine(V1, V3, triangleNormal));
-
-
-            }
-
-            if (!availableedges.ContainsKey(V2))
-            {
-
-                availableedges.Add(V2, new Dictionary<Vector3, List<RaycastHit>> { { V1, RaycastLine(V2, V1, triangleNormal) } });
-
-                availableedges[V2].Add(V3, RaycastLine(V2, V3, triangleNormal));
-            }
-            else
-            {
-
-                if (!availableedges[V2].ContainsKey(V1))
-                    availableedges[V2].Add(V1, RaycastLine(V2, V1, triangleNormal));
-                if (!availableedges[V2].ContainsKey(V3))
-                    availableedges[V2].Add(V3, RaycastLine(V2, V3, triangleNormal));
-
-
-            }
-
-            if (!availableedges.ContainsKey(V3))
-            {
-
-                availableedges.Add(V3, new Dictionary<Vector3, List<RaycastHit>> { { V1, RaycastLine(V3, V1, triangleNormal) } });
-
-                availableedges[V3].Add(V2, RaycastLine(V3, V2, triangleNormal));
-            }
-            else
-            {
-
-                if (!availableedges[V3].ContainsKey(V1))
-                    availableedges[V3].Add(V1, RaycastLine(V1, V3, triangleNormal));
-                if (!availableedges[V3].ContainsKey(V2))
-                    availableedges[V3].Add(V2, RaycastLine(V3, V2, triangleNormal));
-
-
-            }
-
-
-
-            #endregion
-
+            if (self)
+                UpdateColliderSelf(i, triangles, vertices2, normals);
+            if (others)
+                UpdateColliderBoolean(i, triangles, vertices2, normals);
 
             #region Vertex Triangles
 
-            #region 1
-            if (!verticestriangle.ContainsKey(V1))
-            {
-                verticestriangle.Add(V1,
-                    new Dictionary<Vector3, Dictionary<Vector3, int>> { { V2,
-                            new Dictionary<Vector3, int> { { V3, i } } } });
-            }
-            else
-            {
-                if (!verticestriangle[V1].ContainsKey(V2))
-                {
-                    verticestriangle[V1].Add(V2, new Dictionary<Vector3, int> { { V3, i } });
-                }
-                else
-                {
-                    if (!verticestriangle[V1][V2].ContainsKey(V3))
-                    {
-                        verticestriangle[V1][V2].Add(V3, i);
-
-                    }
-
-                }
-            }
-
-            if (!verticestriangle.ContainsKey(V1))
-            {
-                verticestriangle.Add(V1,
-                    new Dictionary<Vector3, Dictionary<Vector3, int>> { { V3,
-                            new Dictionary<Vector3, int> { { V2, i } } } });
-            }
-            else
-            {
-                if (!verticestriangle[V1].ContainsKey(V3))
-                {
-                    verticestriangle[V1].Add(V3, new Dictionary<Vector3, int> { { V2, i } });
-                }
-                else
-                {
-                    if (!verticestriangle[V1][V3].ContainsKey(V2))
-                    {
-                        verticestriangle[V1][V3].Add(V2, i);
-
-                    }
-
-                }
-            }
-            #endregion
-
-            #region 2
-            if (!verticestriangle.ContainsKey(V2))
-            {
-                verticestriangle.Add(V2,
-                    new Dictionary<Vector3, Dictionary<Vector3, int>> { {V1,
-                            new Dictionary<Vector3, int> { { V3, i } } } });
-            }
-            else
-            {
-                if (!verticestriangle[V2].ContainsKey(V1))
-                {
-                    verticestriangle[V2].Add(V1, new Dictionary<Vector3, int> { { V3, i } });
-                }
-                else
-                {
-                    if (!verticestriangle[V2][V1].ContainsKey(V3))
-                    {
-                        verticestriangle[V2][V1].Add(V3, i);
-
-                    }
-
-                }
-            }
-
-            if (!verticestriangle.ContainsKey(V2))
-            {
-                verticestriangle.Add(V2,
-                    new Dictionary<Vector3, Dictionary<Vector3, int>> { { V3,
-                            new Dictionary<Vector3, int> { {V1, i } } } });
-            }
-            else
-            {
-                if (!verticestriangle[V2].ContainsKey(V3))
-                {
-                    verticestriangle[V2].Add(V3, new Dictionary<Vector3, int> { { V1, i } });
-                }
-                else
-                {
-                    if (!verticestriangle[V2][V3].ContainsKey(V1))
-                    {
-                        verticestriangle[V2][V3].Add(V1, i);
-
-                    }
-
-                }
-            }
-            #endregion
-
-            #region 3
-            if (!verticestriangle.ContainsKey(V3))
-            {
-                verticestriangle.Add(V3,
-                    new Dictionary<Vector3, Dictionary<Vector3, int>> { {V1,
-                            new Dictionary<Vector3, int> { { V2, i } } } });
-            }
-            else
-            {
-                if (!verticestriangle[V3].ContainsKey(V1))
-                {
-                    verticestriangle[V3].Add(V1, new Dictionary<Vector3, int> { { V2, i } });
-                }
-                else
-                {
-                    if (!verticestriangle[V3][V1].ContainsKey(V2))
-                    {
-                        verticestriangle[V3][V1].Add(V2, i);
-
-                    }
-
-                }
-            }
-
-            if (!verticestriangle.ContainsKey(V3))
-            {
-                verticestriangle.Add(V3,
-                    new Dictionary<Vector3, Dictionary<Vector3, int>> { { V2,
-                            new Dictionary<Vector3, int> { {V1, i } } } });
-            }
-            else
-            {
-                if (!verticestriangle[V3].ContainsKey(V2))
-                {
-                    verticestriangle[V3].Add(V2, new Dictionary<Vector3, int> { { V1, i } });
-                }
-                else
-                {
-                    if (!verticestriangle[V3][V2].ContainsKey(V1))
-                    {
-                        verticestriangle[V3][V2].Add(V1, i);
-
-                    }
-
-                }
-            }
-            #endregion
-
+            AddVertex(V1, V2, V3, i);
+            AddVertex(V2, V1, V3, i);
+            AddVertex(V3, V1, V2, i);
 
             #endregion
         }
     }
+    public void UpdateColliderBoolean(int i, int[] triangles, Vector3[] vertices2, Vector3[] normals)
+    {
+        int vertexIndex1 = triangles[i * 3];
+        int vertexIndex2 = triangles[i * 3 + 1];
+        int vertexIndex3 = triangles[i * 3 + 2];
+        Vector3 V1 = transform.TransformPoint(vertices2[vertexIndex1]);
+        Vector3 V2 = transform.TransformPoint(vertices2[vertexIndex2]);
+        Vector3 V3 = transform.TransformPoint(vertices2[vertexIndex3]);
+        Vector3 normalA = normals[vertexIndex1];
+        Vector3 normalB = normals[vertexIndex2];
+        Vector3 normalC = normals[vertexIndex3];
+        Vector3 triangleNormal = (normalA + normalB + normalC).normalized;
 
-    public List<RaycastHit> RaycastLine(Vector3 p1, Vector3 p2, Vector3 normal)
+        if (!availableedges.ContainsKey(V1))
+        {
+
+            availableedges.Add(V1, new Dictionary<Vector3, List<RaycastHit>> { { V2, RaycastLineHit(V1, V2, triangleNormal) } });
+
+            availableedges[V1].Add(V3, RaycastLineHit(V1, V3, triangleNormal));
+        }
+        else
+        {
+
+            if (!availableedges[V1].ContainsKey(V2))
+                availableedges[V1].Add(V2, RaycastLineHit(V1, V2, triangleNormal));
+            if (!availableedges[V1].ContainsKey(V3))
+                availableedges[V1].Add(V3, RaycastLineHit(V1, V3, triangleNormal));
+
+
+        }
+
+        if (!availableedges.ContainsKey(V2))
+        {
+
+            availableedges.Add(V2, new Dictionary<Vector3, List<RaycastHit>> { { V1, RaycastLineHit(V2, V1, triangleNormal) } });
+
+            availableedges[V2].Add(V3, RaycastLineHit(V2, V3, triangleNormal));
+        }
+        else
+        {
+
+            if (!availableedges[V2].ContainsKey(V1))
+                availableedges[V2].Add(V1, RaycastLineHit(V2, V1, triangleNormal));
+            if (!availableedges[V2].ContainsKey(V3))
+                availableedges[V2].Add(V3, RaycastLineHit(V2, V3, triangleNormal));
+
+
+        }
+
+        if (!availableedges.ContainsKey(V3))
+        {
+
+            availableedges.Add(V3, new Dictionary<Vector3, List<RaycastHit>> { { V1, RaycastLineHit(V3, V1, triangleNormal) } });
+
+            availableedges[V3].Add(V2, RaycastLineHit(V3, V2, triangleNormal));
+        }
+        else
+        {
+
+            if (!availableedges[V3].ContainsKey(V1))
+                availableedges[V3].Add(V1, RaycastLineHit(V3, V1, triangleNormal));
+            if (!availableedges[V3].ContainsKey(V2))
+                availableedges[V3].Add(V2, RaycastLineHit(V3, V2, triangleNormal));
+
+
+        }
+
+    }
+    public void UpdateColliderSelf(int i, int[] triangles, Vector3[] vertices2, Vector3[] normals)
+    {
+        int vertexIndex1 = triangles[i * 3];
+        int vertexIndex2 = triangles[i * 3 + 1];
+        int vertexIndex3 = triangles[i * 3 + 2];
+        Vector3 V1 = transform.TransformPoint(vertices2[vertexIndex1]);
+        Vector3 V2 = transform.TransformPoint(vertices2[vertexIndex2]);
+        Vector3 V3 = transform.TransformPoint(vertices2[vertexIndex3]);
+        Vector3 normalA = normals[vertexIndex1];
+        Vector3 normalB = normals[vertexIndex2];
+        Vector3 normalC = normals[vertexIndex3];
+        Vector3 triangleNormal = (normalA + normalB + normalC).normalized;
+
+        if (!availableedges.ContainsKey(V1))
+        {
+
+            availableedges.Add(V1, new Dictionary<Vector3, List<RaycastHit>> { { V2, RaycastLineHit(V1, V2, triangleNormal) } });
+
+            availableedges[V1].Add(V3, RaycastLineSelf(V1, V3, triangleNormal));
+        }
+        else
+        {
+
+            if (!availableedges[V1].ContainsKey(V2))
+                availableedges[V1].Add(V2, RaycastLineSelf(V1, V2, triangleNormal));
+            if (!availableedges[V1].ContainsKey(V3))
+                availableedges[V1].Add(V3, RaycastLineSelf(V1, V3, triangleNormal));
+
+
+        }
+
+        if (!availableedges.ContainsKey(V2))
+        {
+
+            availableedges.Add(V2, new Dictionary<Vector3, List<RaycastHit>> { { V1, RaycastLineSelf(V2, V1, triangleNormal) } });
+
+            availableedges[V2].Add(V3, RaycastLineSelf(V2, V3, triangleNormal));
+        }
+        else
+        {
+
+            if (!availableedges[V2].ContainsKey(V1))
+                availableedges[V2].Add(V1, RaycastLineSelf(V2, V1, triangleNormal));
+            if (!availableedges[V2].ContainsKey(V3))
+                availableedges[V2].Add(V3, RaycastLineSelf(V2, V3, triangleNormal));
+
+
+        }
+
+        if (!availableedges.ContainsKey(V3))
+        {
+
+            availableedges.Add(V3, new Dictionary<Vector3, List<RaycastHit>> { { V1, RaycastLineSelf(V3, V1, triangleNormal) } });
+
+            availableedges[V3].Add(V2, RaycastLineSelf(V3, V2, triangleNormal));
+        }
+        else
+        {
+
+            if (!availableedges[V3].ContainsKey(V1))
+                availableedges[V3].Add(V1, RaycastLineSelf(V3, V1, triangleNormal));
+            if (!availableedges[V3].ContainsKey(V2))
+                availableedges[V3].Add(V2, RaycastLineSelf(V3, V2, triangleNormal));
+
+
+        }
+
+    }
+
+    private void AddVertex(Vector3 vertex1, Vector3 vertex2, Vector3 vertex3, int i)
+    {
+        if (!verticestriangle.ContainsKey(vertex1))
+        {
+            verticestriangle[vertex1] = new Dictionary<Vector3, Dictionary<Vector3, int>>();
+        }
+
+        if (!verticestriangle[vertex1].ContainsKey(vertex2))
+        {
+            verticestriangle[vertex1][vertex2] = new Dictionary<Vector3, int>();
+        }
+
+        if (!verticestriangle[vertex1][vertex2].ContainsKey(vertex3))
+        {
+            verticestriangle[vertex1][vertex2][vertex3] = i;
+        }
+    }
+
+    public List<RaycastHit> RaycastLineBoth(Vector3 p1, Vector3 p2, Vector3 normal)
     {
         RaycastHit[] hit = Physics.RaycastAll(p1, p2 - p1, Vector3.Distance(p1, p2));
         RaycastHit[] hit2 = Physics.RaycastAll(p2, p1 - p2, Vector3.Distance(p2, p1));
@@ -434,7 +404,107 @@ public class BooleanOperatorV7 : MonoBehaviour
 
         // Remove the specific collider from the list
         sortedData.RemoveAll(hitResult => hitResult.collider == this.GetComponent<Collider>());
+        string dat = "";
+        if (!(sortedData.Count > 0))
+            return sortedData;
+        foreach (var item in sortedData)
+        {
+            dat += "////" + item.point;
+            Plane plane = new Plane(item.normal, item.point);
+            normal = Vector3.ProjectOnPlane(normal, item.normal);
+            BooleanOperatorV7 boolean = item.collider.GetComponent<BooleanOperatorV7>();
+            if (boolean != null)
+            {
+                if (boolean.vectornormals.ContainsKey(item.point))
+                {
+                    boolean.vectornormals[item.point] = (normal + boolean.vectornormals[item.point]);
 
+                }
+                else
+                {
+                    boolean.vectornormals.Add(item.point, normal);
+
+                }
+                if (boolean.availableTriangles.ContainsKey(item.triangleIndex))
+                {
+                    if (!boolean.availableTriangles[item.triangleIndex].Contains(item.point))
+                    {
+                        boolean.availableTriangles[item.triangleIndex].Add(item.point);
+
+                    }
+
+
+
+                }
+                else
+                {
+                    boolean.availableTriangles.Add(item.triangleIndex, new List<Vector3> { item.point });
+
+                }
+            }
+
+            if (!vectornormals.ContainsKey(item.point))
+            {
+                vectornormals.Add(item.point, vectornormals[p1] + vectornormals[p2]);
+            }
+            else
+            {
+                vectornormals[item.point] = (normal + vectornormals[item.point]);
+            }
+
+        }
+        Debug.Log(p1 + "///" + p2 + dat);
+        return sortedData;
+    }
+    public List<RaycastHit> RaycastLineSelf(Vector3 p1, Vector3 p2, Vector3 normal)
+    {
+        RaycastHit[] hit = Physics.RaycastAll(p1, p2 - p1, Vector3.Distance(p1, p2));
+        RaycastHit[] hit2 = Physics.RaycastAll(p2, p1 - p2, Vector3.Distance(p2, p1));
+        HashSet<RaycastHit> data = new HashSet<RaycastHit>();
+        data.UnionWith(hit);
+        data.UnionWith(hit2);
+        List<RaycastHit> sortedData = data
+            .OrderBy(point =>
+                Mathf.InverseLerp(0, 1, Vector3.Distance(p2, point.point) / Vector3.Distance(p1, p2)))
+            .ToList();
+
+        // Remove the specific collider from the list
+        sortedData.RemoveAll(hitResult => hitResult.collider == this.GetComponent<Collider>());
+        string dat = "";
+        if (!(sortedData.Count > 0))
+            return sortedData;
+        foreach (var item in sortedData)
+        {
+
+
+            if (!vectornormals.ContainsKey(item.point))
+            {
+                vectornormals.Add(item.point, vectornormals[p1] + vectornormals[p2]);
+            }
+            else
+            {
+                vectornormals[item.point] = (normal + vectornormals[item.point]);
+            }
+
+        }
+        return sortedData;
+    }
+    public List<RaycastHit> RaycastLineHit(Vector3 p1, Vector3 p2, Vector3 normal)
+    {
+        RaycastHit[] hit = Physics.RaycastAll(p1, p2 - p1, Vector3.Distance(p1, p2));
+        RaycastHit[] hit2 = Physics.RaycastAll(p2, p1 - p2, Vector3.Distance(p2, p1));
+        HashSet<RaycastHit> data = new HashSet<RaycastHit>();
+        data.UnionWith(hit);
+        data.UnionWith(hit2);
+        List<RaycastHit> sortedData = data
+            .OrderBy(point =>
+                Mathf.InverseLerp(0, 1, Vector3.Distance(p2, point.point) / Vector3.Distance(p1, p2)))
+            .ToList();
+
+        // Remove the specific collider from the list
+        sortedData.RemoveAll(hitResult => hitResult.collider == this.GetComponent<Collider>());
+        if (!(sortedData.Count > 0))
+            return sortedData;
         foreach (var item in sortedData)
         {
             Plane plane = new Plane(item.normal, item.point);
@@ -469,34 +539,10 @@ public class BooleanOperatorV7 : MonoBehaviour
 
                 }
             }
-           
-            if (!vectornormals.ContainsKey(item.point))
-            {
-                vectornormals.Add(item.point, vectornormals[p1] + vectornormals[p2]);
-            }
-            else
-            {
-                vectornormals[item.point] = (normal + vectornormals[item.point]);
-            }
-            
+
+
+
         }
-        return sortedData;
-    }
-    public static List<RaycastHit> RaycastLine(Transform transform, Vector3 p1, Vector3 p2, out RaycastHit[] hit, out RaycastHit[] hit2, Collider colliderToRemove)
-    {
-        hit = Physics.RaycastAll(p1, p2 - p1, Vector3.Distance(p1, p2));
-        hit2 = Physics.RaycastAll(p2, p1 - p2, Vector3.Distance(p2, p1));
-        HashSet<RaycastHit> data = new HashSet<RaycastHit>();
-        data.UnionWith(hit);
-        data.UnionWith(hit2);
-        List<RaycastHit> sortedData = data
-            .OrderBy(point =>
-                Mathf.InverseLerp(0, 1, Vector3.Distance(p2, point.point) / Vector3.Distance(p1, p2)))
-            .ToList();
-
-        // Remove the specific collider from the list
-        sortedData.RemoveAll(hitResult => hitResult.collider == colliderToRemove);
-
         return sortedData;
     }
 
